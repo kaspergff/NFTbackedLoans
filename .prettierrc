@@ -1,0 +1,10 @@
+{
+    "overrides": [
+        {
+            "files": "*.{sol,ts,json}",
+            "options": {
+                "tabWidth": 4
+            }
+        }
+    ]
+}
