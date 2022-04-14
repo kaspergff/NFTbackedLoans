@@ -10,19 +10,19 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 // lib
 import "./lib/LoanLibrary.sol";
 
-// interface
-import "./interface/ICoreLoan.sol";
-
 /**
     @dev Base contract of a NFT backed loan
       This contract tracks al loans
  */
 
-contract CoreLoan is AccessControl, ICoreLoan {
+contract CoreLoan is AccessControl {
     using Counters for Counters.Counter;
     using SafeMath for uint256;
     // Counters
     Counters.Counter private loanIDs;
+
+    // Roles
+    bytes32 public constant CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
 
     // Mappings
     // ids of the loans
@@ -30,13 +30,17 @@ contract CoreLoan is AccessControl, ICoreLoan {
     // track the colleterals in use
     mapping(uint256 => bool) private usedCollateral;
 
+    // events
+    event CreateLoan(LoanLibrary.LoanTerms loanTerms, uint256 loandId);
+
     constructor() {
         // Base admin -> can also revoke its own role
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     function createLoan(LoanLibrary.LoanTerms calldata loanTerms)
         external
+        onlyRole(CONTROLLER_ROLE)
         returns (uint256 loanId)
     {
         // require
@@ -50,15 +54,25 @@ contract CoreLoan is AccessControl, ICoreLoan {
 
         loans[loanId] = LoanLibrary.Loan(
             // State of the loan
-            LoanLibrary.LoanState.Create,
+            LoanLibrary.LoanState.Request,
             // Loan terms
             loanTerms,
             // Borrower ID. When the loan starts this gets filled in.
-            0,
+            uint256(uint160(msg.sender)),
             // Lender ID. When the loan starts this gets filled in.
             0
         );
         usedCollateral[loanTerms.collateralId] = true;
-        emit loanCreated(loanTerms, loanId);
+        emit CreateLoan(loanTerms, loanId);
+    }
+
+    function activateLoan(
+        address lender,
+        address borrower,
+        uint256 loanId
+    ) external onlyRole(CONTROLLER_ROLE) {
+        LoanLibrary.Loan memory loanData = loans[loanId];
+
+        require(loanData.state == LoanLibrary.LoanState.Request, "Wrong state");
     }
 }

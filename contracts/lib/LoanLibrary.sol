@@ -11,15 +11,15 @@ library LoanLibrary {
         LoanState state;
         // Loan terms
         LoanTerms terms;
-        // Borrower
+        // Borrower ID == nft
         uint256 borrowerId;
-        // Lender
+        // Lender ID == nft
         uint256 lenderId;
     }
 
     enum LoanState {
-        Create,
-        Active,
+        Request,
+        Accepted,
         Repaid,
         End
     }
