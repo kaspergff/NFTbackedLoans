@@ -32,28 +32,27 @@ contract FactoryCollateralVault is ERC721Enumerable {
     // function that creates the loan request
     function createLoan(
         uint256 duration,
-        address currency,
         uint256 amount,
         uint256 interestRate
-    ) public {
+    ) internal returns (LoanLibrary.LoanTerms memory terms) {
         // Create vault with collateral
         address vault = createVault(msg.sender);
-        LoanLibrary.LoanTerms memory terms = LoanLibrary.LoanTerms(
+
+        terms = LoanLibrary.LoanTerms(
             duration,
-            currency,
             uint256(uint160(vault)),
             amount,
             interestRate
         );
 
-        initializeLoan(terms, msg.sender);
+        return terms;
     }
 
     // function to start the loan and lock the collateral in a vault on chain
     function initializeLoan(
         LoanLibrary.LoanTerms memory loanTerms,
         address borrower
-    ) public returns (uint256 loanId) {
+    ) external returns (uint256 loanId) {
         require(msg.sender == borrower, "Controller:: Wrong address borrower");
 
         // Create loan request
@@ -65,5 +64,20 @@ contract FactoryCollateralVault is ERC721Enumerable {
                 address(this),
                 loanTerms.collateralId
             );
+    }
+
+    function prematureCancelLoan(uint256 loanId) external {
+        // get loan
+        LoanLibrary.Loan memory loan = CoreLoan(coreLoan).getLoan(loanId);
+        // cancle in CoreLoan
+        bool coreLoanSucces = CoreLoan(coreLoan).cancelLoan(loanId);
+        require(
+            coreLoanSucces == true,
+            "Controller:: CoreLoan.cancelLoan FAILED"
+        );
+
+        // transfer vault back to user
+        IERC721(address(uint160(uint256(loan.terms.collateralId))))
+            .transferFrom(address(this), msg.sender, loan.terms.collateralId);
     }
 }

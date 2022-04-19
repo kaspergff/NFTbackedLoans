@@ -21,18 +21,17 @@ library LoanLibrary {
         Request,
         Accepted,
         Repaid,
-        End
+        End,
+        Cancelled
     }
 
     struct LoanTerms {
         // duration of the loan --> TO DO
         uint256 duration;
-        // currency of the loan
-        address currency;
         // TokenID of the collateral
         uint256 collateralId;
         // amount of the loan in the currency
-        uint256 amount;
+        uint256 loanAmount;
         // interest rate
         uint256 interestRate;
     }

@@ -28,14 +28,35 @@ contract CoreLoan is AccessControl {
     // ids of the loans
     mapping(uint256 => LoanLibrary.Loan) private loans;
     // track the colleterals in use
-    mapping(uint256 => bool) private usedCollateral;
+    mapping(uint256 => bool) public usedCollateral;
 
     // events
-    event CreateLoan(LoanLibrary.LoanTerms loanTerms, uint256 loandId);
+    event CreateLoan(LoanLibrary.LoanTerms loanTerms, uint256 loanId);
+    event CancelLoan(uint256 loanId);
+    event AcceptLoan(uint256 loanId, uint256 lenderId);
+    event RepayLoan(uint256 loanId);
 
     constructor() {
         // Base admin -> can also revoke its own role
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
+
+    // helpers
+
+    function addressToUint256(address addr) private pure returns (uint256) {
+        return uint256(uint160(addr));
+    }
+
+    function counter() external view returns (uint256) {
+        return loanIDs.current();
+    }
+
+    function getLoan(uint256 loanId)
+        public
+        view
+        returns (LoanLibrary.Loan memory loan)
+    {
+        return loans[loanId];
     }
 
     function createLoan(LoanLibrary.LoanTerms calldata loanTerms)
@@ -59,20 +80,75 @@ contract CoreLoan is AccessControl {
             loanTerms,
             // Borrower ID. When the loan starts this gets filled in.
             uint256(uint160(msg.sender)),
-            // Lender ID. When the loan starts this gets filled in.
+            // Lender ID. When the loan is accepted this gets filled in.
             0
         );
+
         usedCollateral[loanTerms.collateralId] = true;
         emit CreateLoan(loanTerms, loanId);
     }
 
-    function activateLoan(
-        address lender,
-        address borrower,
-        uint256 loanId
-    ) external onlyRole(CONTROLLER_ROLE) {
-        LoanLibrary.Loan memory loanData = loans[loanId];
+    // function to cancel loan before it is accepted
+    function cancelLoan(uint256 loanId)
+        external
+        onlyRole(CONTROLLER_ROLE)
+        returns (bool)
+    {
+        // LoanLibrary.Loan memory loan = getLoan(loanId);
+        LoanLibrary.Loan storage loan = loans[loanId];
+        require(
+            addressToUint256(msg.sender) == loan.borrowerId,
+            "CoreLoan:: function cancelLoan. Only cancel your own loan"
+        );
+        require(
+            loan.state == LoanLibrary.LoanState.Request,
+            "CoreLoan:: function cancelLoan. Only cancel non accepted loan"
+        );
+        loan.state = LoanLibrary.LoanState.Cancelled;
+        usedCollateral[loan.terms.collateralId] = false;
+        emit CancelLoan(loanId);
+        bool succes = true;
+        return succes;
+    }
 
-        require(loanData.state == LoanLibrary.LoanState.Request, "Wrong state");
+    function acceptLoan(address lender, uint256 loanId)
+        external
+        onlyRole(CONTROLLER_ROLE)
+    {
+        LoanLibrary.Loan storage loanData = loans[loanId];
+        uint256 lenderId = addressToUint256(lender);
+        require(
+            loanData.state == LoanLibrary.LoanState.Request,
+            "CoreLoan:: function acceptLoan, Wrong state"
+        );
+        require(
+            msg.sender == lender,
+            "CoreLoan:: function acceptLoan, user error"
+        );
+        require(
+            lenderId != loanData.borrowerId,
+            "CoreLoan:: function acceptLoan, Tried to accept own loan"
+        );
+
+        loanData.lenderId = lenderId;
+        loanData.state = LoanLibrary.LoanState.Accepted;
+        emit AcceptLoan(loanId, lenderId);
+    }
+
+    // Time check
+    function repayLoan(uint256 loanId) external onlyRole(CONTROLLER_ROLE) {
+        LoanLibrary.Loan storage loanData = loans[loanId];
+        require(
+            loanData.state == LoanLibrary.LoanState.Accepted,
+            "CoreLoan:: function repayLoan, Wrong state"
+        );
+        require(
+            addressToUint256(msg.sender) == loanData.borrowerId,
+            "CoreLoan:: function repayLoan, Borrower needs to pay back"
+        );
+
+        loanData.state = LoanLibrary.LoanState.Repaid;
+        usedCollateral[loanData.terms.collateralId] = false;
+        emit RepayLoan(loanId);
     }
 }
