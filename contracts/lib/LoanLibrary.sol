@@ -30,6 +30,8 @@ library LoanLibrary {
         uint256 duration;
         // TokenID of the collateral
         uint256 collateralId;
+        // adress of Collateral
+        address collateralAddress;
         // amount of the loan in the currency
         uint256 loanAmount;
         // interest rate

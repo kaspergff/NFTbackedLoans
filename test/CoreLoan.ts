@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { BigNumber, Signer } from "ethers";
 import hre, { ethers, waffle } from "hardhat";
 import { mintERC721 } from "./util/testERC721";
-import { LoanTerms } from "./util/types";
+import { LoanTerms, generateLoanTerms } from "./util/types";
 
 const { loadFixture } = waffle;
 const zero = hre.ethers.utils.parseUnits("0", 18);
@@ -33,29 +33,18 @@ describe("CoreLoan ", async () => {
         return { coreLoan, admin, user2, controller, testERC721 };
     };
 
-    const generateLoanTerms = ({
-        duration = BigNumber.from(10000),
-        collateralId = BigNumber.from(10),
-        loanAmount = hre.ethers.utils.parseEther("100"),
-        interestRate = hre.ethers.utils.parseEther("3.5"),
-    }): LoanTerms => {
-        return {
-            duration,
-            collateralId,
-            loanAmount,
-            interestRate,
-        };
-    };
-
     const checkTerms = (chain: LoanTerms, local: LoanTerms) => {
         expect(chain.duration).to.equal(local.duration);
         expect(chain.collateralId).to.equal(local.collateralId);
         expect(chain.loanAmount).to.equal(local.loanAmount);
+        expect(chain.collateralAddress).to.equal(local.collateralAddress);
         expect(chain.interestRate).to.equal(local.interestRate);
     };
 
     const createLoan = async (coreLoan: any, user: Signer, loanTerms: any) => {
-        const tx = await coreLoan.connect(user).createLoan(loanTerms);
+        const tx = await coreLoan
+            .connect(user)
+            .createLoan(loanTerms, await user.getAddress());
         const receipt = await tx.wait();
         if (receipt.events[0].args) {
             return receipt.events[0].args.loanId;
@@ -102,10 +91,11 @@ describe("CoreLoan ", async () => {
         it("Should emit de CreateLoan event", async () => {
             const { coreLoan, admin } = await loadFixture(fixture);
             const loanTerms = generateLoanTerms({});
-            await expect(coreLoan.connect(admin).createLoan(loanTerms)).to.emit(
-                coreLoan,
-                "CreateLoan"
-            );
+            await expect(
+                coreLoan
+                    .connect(admin)
+                    .createLoan(loanTerms, await admin.getAddress())
+            ).to.emit(coreLoan, "CreateLoan");
         });
 
         it("Should reject user without CONTROLLER_ROLE role", async () => {
@@ -133,7 +123,9 @@ describe("CoreLoan ", async () => {
             expect(loanDataOnChain.state).to.equal(0);
 
             // cancel loan
-            await coreLoan.connect(admin).cancelLoan(loanId);
+            await coreLoan
+                .connect(admin)
+                .cancelLoan(loanId, await admin.getAddress());
             const loanDataOnChain2 = await coreLoan.getLoan(loanId);
             expect(loanDataOnChain2.state).to.equal(4);
             const usedCollateral = await coreLoan
@@ -148,12 +140,12 @@ describe("CoreLoan ", async () => {
             const loanTerms = generateLoanTerms({ collateralId });
             const loanId = await createLoan(coreLoan, admin, loanTerms);
 
-            await expect(coreLoan.connect(admin).cancelLoan(loanId)).to.emit(
-                coreLoan,
-                "CancelLoan"
-            );
+            await expect(
+                coreLoan
+                    .connect(admin)
+                    .cancelLoan(loanId, await admin.getAddress())
+            ).to.emit(coreLoan, "CancelLoan");
         });
-        console.log("MORE TEST TO BE MADE");
     });
 
     describe("Accept loan function", () => {

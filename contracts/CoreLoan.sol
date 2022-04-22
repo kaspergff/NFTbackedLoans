@@ -6,6 +6,9 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "./utils.sol" as Util;
+
+import "hardhat/console.sol";
 
 // lib
 import "./lib/LoanLibrary.sol";
@@ -41,12 +44,6 @@ contract CoreLoan is AccessControl {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    // helpers
-
-    function addressToUint256(address addr) private pure returns (uint256) {
-        return uint256(uint160(addr));
-    }
-
     function counter() external view returns (uint256) {
         return loanIDs.current();
     }
@@ -59,11 +56,10 @@ contract CoreLoan is AccessControl {
         return loans[loanId];
     }
 
-    function createLoan(LoanLibrary.LoanTerms calldata loanTerms)
-        external
-        onlyRole(CONTROLLER_ROLE)
-        returns (uint256 loanId)
-    {
+    function createLoan(
+        LoanLibrary.LoanTerms calldata loanTerms,
+        address borrower
+    ) external onlyRole(CONTROLLER_ROLE) returns (uint256 loanId) {
         // require
         require(
             !usedCollateral[loanTerms.collateralId],
@@ -79,7 +75,7 @@ contract CoreLoan is AccessControl {
             // Loan terms
             loanTerms,
             // Borrower ID. When the loan starts this gets filled in.
-            uint256(uint160(msg.sender)),
+            uint256(uint160(borrower)),
             // Lender ID. When the loan is accepted this gets filled in.
             0
         );
@@ -89,15 +85,14 @@ contract CoreLoan is AccessControl {
     }
 
     // function to cancel loan before it is accepted
-    function cancelLoan(uint256 loanId)
+    function cancelLoan(uint256 loanId, address borrower)
         external
         onlyRole(CONTROLLER_ROLE)
-        returns (bool)
     {
         // LoanLibrary.Loan memory loan = getLoan(loanId);
         LoanLibrary.Loan storage loan = loans[loanId];
         require(
-            addressToUint256(msg.sender) == loan.borrowerId,
+            Util.addressToUint256(borrower) == loan.borrowerId,
             "CoreLoan:: function cancelLoan. Only cancel your own loan"
         );
         require(
@@ -107,8 +102,6 @@ contract CoreLoan is AccessControl {
         loan.state = LoanLibrary.LoanState.Cancelled;
         usedCollateral[loan.terms.collateralId] = false;
         emit CancelLoan(loanId);
-        bool succes = true;
-        return succes;
     }
 
     function acceptLoan(address lender, uint256 loanId)
@@ -116,14 +109,10 @@ contract CoreLoan is AccessControl {
         onlyRole(CONTROLLER_ROLE)
     {
         LoanLibrary.Loan storage loanData = loans[loanId];
-        uint256 lenderId = addressToUint256(lender);
+        uint256 lenderId = Util.addressToUint256(lender);
         require(
             loanData.state == LoanLibrary.LoanState.Request,
             "CoreLoan:: function acceptLoan, Wrong state"
-        );
-        require(
-            msg.sender == lender,
-            "CoreLoan:: function acceptLoan, user error"
         );
         require(
             lenderId != loanData.borrowerId,
@@ -143,7 +132,7 @@ contract CoreLoan is AccessControl {
             "CoreLoan:: function repayLoan, Wrong state"
         );
         require(
-            addressToUint256(msg.sender) == loanData.borrowerId,
+            Util.addressToUint256(msg.sender) == loanData.borrowerId,
             "CoreLoan:: function repayLoan, Borrower needs to pay back"
         );
 
