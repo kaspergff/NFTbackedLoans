@@ -4,9 +4,9 @@ import { TestERC721 } from "../../typechain/TestERC721";
 
 export const mintERC721 = async (
     token: TestERC721,
-    address: Signer
+    to: Signer
 ): Promise<BigNumber> => {
-    const tx = await token.safeMint(await address.getAddress());
+    const tx = await token.safeMint(await to.getAddress());
     const receipt = await tx.wait();
 
     if (receipt.events && receipt.events[0].args) {

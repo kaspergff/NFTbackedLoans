@@ -11,9 +11,9 @@ library LoanLibrary {
         LoanState state;
         // Loan terms
         LoanTerms terms;
-        // Borrower ID == nft
+        // Borrower ID == nft??
         uint256 borrowerId;
-        // Lender ID == nft
+        // Lender ID == nft??
         uint256 lenderId;
     }
 

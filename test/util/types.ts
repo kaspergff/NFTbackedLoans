@@ -24,3 +24,21 @@ export const generateLoanTerms = ({
         interestRate,
     };
 };
+
+export const generateLoanTerms2 = (
+    collateralId: BigNumber,
+    collateralAddress: string,
+    {
+        duration = BigNumber.from(10000),
+        loanAmount = hre.ethers.utils.parseEther("100"),
+        interestRate = hre.ethers.utils.parseEther("3.5"),
+    }
+): LoanTerms => {
+    return {
+        duration,
+        collateralId,
+        collateralAddress,
+        loanAmount,
+        interestRate,
+    };
+};
