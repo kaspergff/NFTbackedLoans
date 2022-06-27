@@ -26,7 +26,7 @@ library LoanLibrary {
     }
 
     struct LoanTerms {
-        // duration of the loan --> TO DO
+        // duration of the loan in seconds .... --> TO DO
         uint256 duration;
         // TokenID of the collateral
         uint256 collateralId;
@@ -35,6 +35,8 @@ library LoanLibrary {
         // amount of the loan in the currency
         uint256 loanAmount;
         // interest rate
-        uint256 interestRate;
+        uint256 interestAmount;
+        // Start block.timestamp
+        uint256 startTimestamp;
     }
 }

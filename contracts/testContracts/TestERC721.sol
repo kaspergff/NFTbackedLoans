@@ -3,6 +3,7 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "hardhat/console.sol";
 
 contract TestERC721 is ERC721 {
     using Counters for Counters.Counter;
@@ -12,6 +13,7 @@ contract TestERC721 is ERC721 {
     constructor() ERC721("TestERC721", "TEST") {}
 
     function safeMint(address to) public {
+        // console.log("SAFEMINT");
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
         _safeMint(to, tokenId);

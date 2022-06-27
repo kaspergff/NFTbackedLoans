@@ -37,6 +37,7 @@ contract Loan is AccessControl, ERC721Holder {
     );
     event CancelLoan(uint256 loanId);
     event AcceptLoan(uint256 loanId, uint256 lenderId);
+    event PayBackLoan(uint256 loanId, uint256 payBackAmount);
 
     constructor() {
         // Base admin -> can also revoke its own role
@@ -60,10 +61,6 @@ contract Loan is AccessControl, ERC721Holder {
         external
         returns (uint256 loanId)
     {
-        // console.log(msg.sender);
-        // console.log(
-        //     IERC721(loanTerms.collateralAddress).ownerOf(loanTerms.collateralId)
-        // );
         require(
             !usedCollateral[loanTerms.collateralId],
             "createLoan: Collateral allready in use"
@@ -151,6 +148,9 @@ contract Loan is AccessControl, ERC721Holder {
         loanData.lenderId = lenderId;
         loanData.state = LoanLibrary.LoanState.Accepted;
 
+        // set start timestamp
+        loanData.terms.startTimestamp = block.timestamp;
+
         // transfer Eth
         address borrower = address(uint160(uint256(loanData.borrowerId)));
         // solhint-disable-next-line avoid-low-level-calls
@@ -158,5 +158,48 @@ contract Loan is AccessControl, ERC721Holder {
         require(success, "AcceptLoan: Call Eth failed");
 
         emit AcceptLoan(loanId, Util.addressToUint256(msg.sender));
+    }
+
+    function getPayBackAmount(uint256 loanId) public view returns (uint256) {
+        LoanLibrary.Loan memory loanData = loans[loanId];
+        uint256 payBackAmount = loanData.terms.loanAmount +
+            loanData.terms.interestAmount;
+        return payBackAmount;
+    }
+
+    function payBackLoan(uint256 loanId) external payable {
+        LoanLibrary.Loan storage loanData = loans[loanId];
+        require(
+            loanData.state == LoanLibrary.LoanState.Accepted,
+            "payBackLoan, Loan in wrong state"
+        );
+
+        require(
+            loanData.terms.startTimestamp + loanData.terms.duration >
+                block.timestamp,
+            "payBackLoan, Time is up"
+        );
+        uint256 payBackAmount = getPayBackAmount(loanId);
+        require(
+            msg.value == payBackAmount,
+            "payBackLoan: payBackAmount not enough"
+        );
+
+        // transfer Eth
+        address lender = address(uint160(uint256(loanData.lenderId)));
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, ) = lender.call{value: payBackAmount}("");
+        require(success, "payBackLoan: Call Eth failed");
+
+        // transfer collateral
+        IERC721(loanData.terms.collateralAddress).transferFrom(
+            address(this),
+            msg.sender,
+            loanData.terms.collateralId
+        );
+
+        loanData.state = LoanLibrary.LoanState.Repaid;
+
+        emit PayBackLoan(loanId, payBackAmount);
     }
 }
